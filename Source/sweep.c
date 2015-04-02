@@ -621,7 +621,8 @@ static int CheckForRightSplice( TESStesselator *tess, ActiveRegion *regUp )
 	if( VertLeq( eUp->Org, eLo->Org )) {
 		if( EdgeSign( eLo->Dst, eUp->Org, eLo->Org ) > 0 ) return FALSE;
 
-        /* before:
+        /*
+         * before:
          *                                             sweep line
          * .                                               |
          *       .                                         |
@@ -634,16 +635,15 @@ static int CheckForRightSplice( TESStesselator *tess, ActiveRegion *regUp )
          *                                                 .
          * after:                                          |
          *                                                 |
-         *                                                 |
          * .                                               |
-         *              .                                  |
-         *   regUp                .                        |
-         *                                 .               |
-         *                                          .      |
-         * . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-         *                regLo                            |     edge_new
-         *                                                 |
-         *                                                  
+         *       .                                         |
+         *   regUp     .                                   |
+         *                   .                             |
+         *                         .                       |
+         * .                             .                 |               .
+         *              .                     .            |          .
+         *                                .          .     |     .
+         *                   regLo                         .      edge_new
          *                                            
          *                                                  
          */
@@ -658,25 +658,25 @@ static int CheckForRightSplice( TESStesselator *tess, ActiveRegion *regUp )
         /* before:
          *
          * . 
-         *              .        
-         *   regUp                    .
-         *                                          .                        
-         *                                                        .         
-         *                                                                 x 
-         * . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . x .
-         *                                regLo                                .
-         *                                            
-         * after:
-         *
-         * . 
-         *              .        
-         *   regUp                    .
-         *                                          .                        
-         *                                                        .         
-         *                                                                  
+         *              .                                                sweep line
+         *   regUp                    .                                      |
+         *                                          .                        |
+         *                                                        .          |
+         *                                                                   .
          * . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-         *                                regLo                                .
-         *                                            
+         *                                regLo                              | 
+         *                                                                   |
+         * after:                                                            |
+         *                                                                   |
+         * .                                                                 |
+         *              .                                                    |
+         *   regUp                    .                                      |
+         *                                          .                        |
+         *                                                        .          |
+         *                                                                   |
+         * . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+         *                                regLo                              | 
+         *                                                                   |
          *                                                  
          */
         else if( eUp->Org != eLo->Org ) {
@@ -687,31 +687,30 @@ static int CheckForRightSplice( TESStesselator *tess, ActiveRegion *regUp )
 	} else {
 		if( EdgeSign( eUp->Dst, eLo->Org, eUp->Org ) < 0 ) return FALSE;
 
-        /*   
-         * before:
+        /*    
+         *                                    sweep line
+         * before:                                |
          *                                        .
-         *                                   .
-         *                              .
+         *                                   .    |
+         *                              .         |
          * . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-         *     regUp           .                        
-         *                .                                
-         *           .
-         *      .     regLo
-         * .        
+         *     regUp           .                  |     
+         *                .                       |        
+         *           .                            |
+         *      .     regLo                       |
+         * .                                      |
+         *                                        |
+         *                                        .
+         *                          .        .    |        .    edge_new
+         *              .               .         |                .
+         * .                       .              |                        .
+         *     regUp           .                  |     
+         *                .                       |        
+         *           .                            |
+         *      .     regLo                       |
+         * .                                      |
          *
-         *
-         * 
-         *                                         
-         *                                    
-         *                               
-         * . . . . . . . . . . . . . * . . . . . . . . . . . . . . . . . . .
-         *     regUp           .                   edge_new     
-         *                .                                
-         *           .
-         *      .     regLo
-         * .        
-         *
-        */
+         */
 		/* eLo->Org appears to be above eUp, so splice eLo->Org into eUp */
 		RegionAbove(regUp)->dirty = regUp->dirty = TRUE;
 		if (tessMeshSplitEdge( tess->mesh, eUp->Sym ) == NULL) longjmp(tess->env,1);
@@ -750,26 +749,31 @@ static int CheckForLeftSplice( TESStesselator *tess, ActiveRegion *regUp )
 	if( VertLeq( eUp->Dst, eLo->Dst )) {
 		if( EdgeSign( eUp->Dst, eLo->Dst, eUp->Org ) < 0 ) return FALSE;
 
-        /* 
-         * before:
+        /*        
+         *          sweep line
+         *              |  
+         * before:      |
          *              .
-         *                 .
-         *                    .
+         *              |  .
+         *              |     .
          * . . . . . . . . . . . . . . . . . . .
-         *          regUp           .
-         *                             .
-         *                         regLo  .
-         *                                   .
+         *              |           .    regUp
+         *              |              .
+         *              |          regLo  .
+         *              |                    .
+         *              |
+         * after:       |
+         *              |
+         *              .
+         * edge_new .   |  .   .
+         *      .       |     .        .
+         * .            |        .  regUp       .
+         *              |           .
+         *              |              .
+         *              |          regLo  .
+         *              |                    .
          * 
-         * after:
-         *               
-         *                  
-         * . . . . . . . . . . . . . . . . . . .
-         *              e           .     regUp
-         *                             .
-         *                         regLo  .
-         *                                   .
-        */
+         */
 
 		/* eLo->Dst is above eUp, so splice eLo->Dst into eUp */
 		RegionAbove(regUp)->dirty = regUp->dirty = TRUE;
@@ -780,26 +784,27 @@ static int CheckForLeftSplice( TESStesselator *tess, ActiveRegion *regUp )
 	} else {
 		if( EdgeSign( eLo->Dst, eUp->Dst, eLo->Org ) > 0 ) return FALSE;
 
-        /* 
-         * before:
-         *                               .
-         *                             .
-         *                          .  regUp
+        /*              
+         *           sweep line
+         *               |
+         * before:       |
+         *               |               .
+         *               |             .
+         *               |          .  regUp
          * . . . . . . . . . . . . . . . . . . .
-         *          regLo      .        
-         *                  .             
+         *               |     .       regLo
+         *               |  .             
          *               .          
-         *                                  
-         *
-         * after: 
-         * 
-         *                               .
-         *                             .
-         *                          .  regUp
-         * . . . . . . . . . . . . . . . . . . .
-         *            e              regLo               
-         *                                
-         *
+         *               |                  
+         *               |
+         * after:        |
+         *               |               .
+         *               |             .
+         *               |          .  regUp
+         * .             |        .            .
+         *      .        |     .       .  
+         *          .    |  .   .      regLo   
+         * edge_new      .          
          */
 
 		/* eUp->Dst is below eLo, so splice eUp->Dst into eLo */
