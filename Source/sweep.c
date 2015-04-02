@@ -623,7 +623,6 @@ static int CheckForRightSplice( TESStesselator *tess, ActiveRegion *regUp )
 
         /*
          * before:
-         *                                             sweep line
          * .                                               |
          *       .                                         |
          *   regUp     .                                   |
@@ -658,13 +657,13 @@ static int CheckForRightSplice( TESStesselator *tess, ActiveRegion *regUp )
         /* before:
          *
          * . 
-         *              .                                                sweep line
+         *              .                                                
          *   regUp                    .                                      |
          *                                          .                        |
-         *                                                        .          |
-         *                                                                   .
+         *                                                      .            |
+         *                                                                   |
          * . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
-         *                                regLo                              | 
+         *                                regLo                              . 
          *                                                                   |
          * after:                                                            |
          *                                                                   |
@@ -688,7 +687,7 @@ static int CheckForRightSplice( TESStesselator *tess, ActiveRegion *regUp )
 		if( EdgeSign( eUp->Dst, eLo->Org, eUp->Org ) < 0 ) return FALSE;
 
         /*    
-         *                                    sweep line
+         *                                     
          * before:                                |
          *                                        .
          *                                   .    |
@@ -750,7 +749,6 @@ static int CheckForLeftSplice( TESStesselator *tess, ActiveRegion *regUp )
 		if( EdgeSign( eUp->Dst, eLo->Dst, eUp->Org ) < 0 ) return FALSE;
 
         /*        
-         *          sweep line
          *              |  
          * before:      |
          *              .
@@ -785,7 +783,6 @@ static int CheckForLeftSplice( TESStesselator *tess, ActiveRegion *regUp )
 		if( EdgeSign( eLo->Dst, eUp->Dst, eLo->Org ) > 0 ) return FALSE;
 
         /*              
-         *           sweep line
          *               |
          * before:       |
          *               |               .
@@ -892,6 +889,16 @@ static int CheckForIntersect( TESStesselator *tess, ActiveRegion *regUp )
 
 	if( VertEq( &isect, orgUp ) || VertEq( &isect, orgLo )) {
 		/* Easy case -- intersection at one of the right endpoints */
+        /* 
+         *  . . . . . . . . .|.
+         *      regUp       .
+         *                .
+         *              .
+         *            . regLo
+         *          .
+         *        .
+         *
+         */
 		(void) CheckForRightSplice( tess, regUp );
 		return FALSE;
 	}
@@ -1101,6 +1108,22 @@ static void ConnectRightVertex( TESStesselator *tess, ActiveRegion *regUp,
 	int degenerate = FALSE;
 
 	if( eUp->Dst != eLo->Dst ) {
+        /*
+         *                                                    .
+         * . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+         *                    regUp                         .
+         *                                                 .
+         *                              . . . . . .       .
+         *                                     . .       .
+         *                                   .  .       .
+         *                   (finished)    .   .       .
+         *                                    .       .
+         *                                   .       .
+         *                                          . regLo
+         *                                         .
+         *                                        .
+         *
+         */
 		(void) CheckForIntersect( tess, regUp );
 	}
 
