@@ -20,6 +20,8 @@ test
 .Trashes
 ehthumbs.db
 Thumbs.db
+*.swp
+*.swo
 
 ## Build dir
 Build/*

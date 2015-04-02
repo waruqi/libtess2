@@ -115,6 +115,17 @@ static int EdgeLeq( TESStesselator *tess, ActiveRegion *reg1, ActiveRegion *reg2
 
 	if( e1->Dst == event ) {
 		if( e2->Dst == event ) {
+
+            /* 
+             *       .                      .
+             *   e1.                 e1   .
+             *   .                      .
+             * . event                . event
+             *   .                      .
+             *     .                 e2   .
+             *   e2  .
+             *          .
+             */
 			/* Two edges right of the sweep line which meet at the sweep event.
 			* Sort them by slope.
 			*/
@@ -123,12 +134,47 @@ static int EdgeLeq( TESStesselator *tess, ActiveRegion *reg1, ActiveRegion *reg2
 			}
 			return EdgeSign( e1->Dst, e2->Org, e1->Org ) >= 0;
 		}
+
+
+        /*       e1
+         * <. . . . . . .
+         *  event
+         * 
+         *
+         *  .
+         *    .  e2
+         *      .
+         *        .
+         */
 		return EdgeSign( e2->Dst, event, e2->Org ) <= 0;
 	}
+
+
+    /*       e1
+     * <. . . . . . .
+     *  
+     * 
+     *  event
+     *  .
+     *    .  e2
+     *      .
+     *        .
+     */
 	if( e2->Dst == event ) {
 		return EdgeSign( e1->Dst, event, e1->Org ) >= 0;
 	}
 
+
+    /*       e1
+     * <. . . . . . .
+     *  
+     *       . event
+     *  
+     *  .
+     *    .  e2
+     *      .
+     *        .
+     */
 	/* General case - compute signed distance *from* e1, e2 to event */
 	t1 = EdgeEval( e1->Dst, event, e1->Org );
 	t2 = EdgeEval( e2->Dst, event, e2->Org );
@@ -179,6 +225,35 @@ static ActiveRegion *TopLeftRegion( TESStesselator *tess, ActiveRegion *reg )
 	* now is the time to fix it.
 	*/
 	if( reg->fixUpperEdge ) {
+        /*   
+         * before:
+         *
+         *          fixEdge
+         *  . . . . . . . . . . . .
+         *            reg
+         *         
+         *     
+         *        . . . . . .
+         *                 .
+         *                .
+         *               .
+         *
+         * 
+         * after:
+         *
+         *  . . . . . . . . . . . .
+         *           reg
+         *          
+         *  .  
+         *      .     
+         *          .
+         *     reg'     .
+         *        . . . . . .
+         *                 .
+         *                .
+         *               .
+ 
+         */
 		e = tessMeshConnect( tess->mesh, RegionBelow(reg)->eUp->Sym, reg->eUp->Lnext );
 		if (e == NULL) return NULL;
 		if ( !FixUpperEdge( tess, reg, e ) ) return NULL;
@@ -307,8 +382,34 @@ static TESShalfEdge *FinishLeftRegions( TESStesselator *tess,
 			/* If the edge below was a temporary edge introduced by
 			* ConnectRightVertex, now is the time to fix it.
 			*/
+
+            /*
+             * before:
+             *      .
+             *         .      .
+             *            .    .
+             *       ePrev   .  .
+             *                   .
+             *
+             *
+             *         . . . . . . .
+             *           e/reg/fix
+             *
+             * after:
+             *      .
+             *         .      .
+             *            .    .
+             *       ePrev   .  .
+             *                   .
+             *                .
+             *             . e
+             *         .    reg
+             *            
+             */
 			e = tessMeshConnect( tess->mesh, ePrev->Lprev, e->Sym );
 			if (e == NULL) longjmp(tess->env,1);
+
+            /* may change reg->eUp */
 			if ( !FixUpperEdge( tess, reg, e ) ) longjmp(tess->env,1);
 		}
 
@@ -317,7 +418,7 @@ static TESShalfEdge *FinishLeftRegions( TESStesselator *tess,
 			if ( !tessMeshSplice( tess->mesh, e->Oprev, e ) ) longjmp(tess->env,1);
 			if ( !tessMeshSplice( tess->mesh, ePrev, e ) ) longjmp(tess->env,1);
 		}
-		FinishRegion( tess, regPrev );	/* may change reg->eUp */
+		FinishRegion( tess, regPrev );	
 		ePrev = reg->eUp;
 		regPrev = reg;
 	}
@@ -325,6 +426,23 @@ static TESShalfEdge *FinishLeftRegions( TESStesselator *tess,
 }
 
 
+/*
+ * . . . . . . . . . . . . . . . . . . . . .
+ *                  regUp
+ *
+ *               (ePrev)
+ *               topLeft
+ *                  .        .e
+ *                    .     .
+ *                      .  .  region_new1
+ *           finished     . . . . . . . .
+ *                     .    .    region_new2 
+ *                  .         .
+ *               .  region_new3 .
+ *
+ * . . . . . . . . . . . . . . . . . . . . .
+ *                  regLo
+ */
 static void AddRightEdges( TESStesselator *tess, ActiveRegion *regUp,
 						  TESShalfEdge *eFirst, TESShalfEdge *eLast, TESShalfEdge *eTopLeft,
 						  int cleanUp )
@@ -374,9 +492,32 @@ static void AddRightEdges( TESStesselator *tess, ActiveRegion *regUp,
 		reg->windingNumber = regPrev->windingNumber - e->winding;
 		reg->inside = IsWindingInside( tess, reg->windingNumber );
 
+        // TODO
 		/* Check for two outgoing edges with same slope -- process these
 		* before any intersection tests (see example in tessComputeInterior).
 		*/
+
+        /* before:
+         *
+         *   .
+         *   .  . 
+         *      .  .
+         *         .  . 
+         *            .  .
+         *                  .
+         *                     .
+         * or
+         *
+         *   .
+         *   .  . 
+         *      .  .
+         *         .  . 
+         *            .  
+         *               .  
+         *                  .  
+         *                     .
+         *
+         */
 		regPrev->dirty = TRUE;
 		if( ! firstTime && CheckForRightSplice( tess, regPrev )) {
 			AddWinding( e, ePrev );
@@ -480,6 +621,32 @@ static int CheckForRightSplice( TESStesselator *tess, ActiveRegion *regUp )
 	if( VertLeq( eUp->Org, eLo->Org )) {
 		if( EdgeSign( eLo->Dst, eUp->Org, eLo->Org ) > 0 ) return FALSE;
 
+        /* before:
+         *                                             sweep line
+         * .                                               |
+         *       .                                         |
+         *   regUp     .                                   |
+         *                   .                             |
+         *                         .                       |
+         * . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+         *                regLo               .            |
+         *                                           .     |
+         *                                                 .
+         * after:                                          |
+         *                                                 |
+         *                                                 |
+         * .                                               |
+         *              .                                  |
+         *   regUp                .                        |
+         *                                 .               |
+         *                                          .      |
+         * . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+         *                regLo                            |     edge_new
+         *                                                 |
+         *                                                  
+         *                                            
+         *                                                  
+         */
 		/* eUp->Org appears to be below eLo */
 		if( ! VertEq( eUp->Org, eLo->Org )) {
 			/* Splice eUp->Org into eLo */
@@ -487,7 +654,32 @@ static int CheckForRightSplice( TESStesselator *tess, ActiveRegion *regUp )
 			if ( !tessMeshSplice( tess->mesh, eUp, eLo->Oprev ) ) longjmp(tess->env,1);
 			regUp->dirty = regLo->dirty = TRUE;
 
-		} else if( eUp->Org != eLo->Org ) {
+		}
+        /* before:
+         *
+         * . 
+         *              .        
+         *   regUp                    .
+         *                                          .                        
+         *                                                        .         
+         *                                                                 x 
+         * . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . x .
+         *                                regLo                                .
+         *                                            
+         * after:
+         *
+         * . 
+         *              .        
+         *   regUp                    .
+         *                                          .                        
+         *                                                        .         
+         *                                                                  
+         * . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+         *                                regLo                                .
+         *                                            
+         *                                                  
+         */
+        else if( eUp->Org != eLo->Org ) {
 			/* merge the two vertices, discarding eUp->Org */
 			pqDelete( tess->pq, eUp->Org->pqHandle );
 			SpliceMergeVertices( tess, eLo->Oprev, eUp );
@@ -495,6 +687,31 @@ static int CheckForRightSplice( TESStesselator *tess, ActiveRegion *regUp )
 	} else {
 		if( EdgeSign( eUp->Dst, eLo->Org, eUp->Org ) < 0 ) return FALSE;
 
+        /*   
+         * before:
+         *                                        .
+         *                                   .
+         *                              .
+         * . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+         *     regUp           .                        
+         *                .                                
+         *           .
+         *      .     regLo
+         * .        
+         *
+         *
+         * 
+         *                                         
+         *                                    
+         *                               
+         * . . . . . . . . . . . . . * . . . . . . . . . . . . . . . . . . .
+         *     regUp           .                   edge_new     
+         *                .                                
+         *           .
+         *      .     regLo
+         * .        
+         *
+        */
 		/* eLo->Org appears to be above eUp, so splice eLo->Org into eUp */
 		RegionAbove(regUp)->dirty = regUp->dirty = TRUE;
 		if (tessMeshSplitEdge( tess->mesh, eUp->Sym ) == NULL) longjmp(tess->env,1);
@@ -533,6 +750,27 @@ static int CheckForLeftSplice( TESStesselator *tess, ActiveRegion *regUp )
 	if( VertLeq( eUp->Dst, eLo->Dst )) {
 		if( EdgeSign( eUp->Dst, eLo->Dst, eUp->Org ) < 0 ) return FALSE;
 
+        /* 
+         * before:
+         *              .
+         *                 .
+         *                    .
+         * . . . . . . . . . . . . . . . . . . .
+         *          regUp           .
+         *                             .
+         *                         regLo  .
+         *                                   .
+         * 
+         * after:
+         *               
+         *                  
+         * . . . . . . . . . . . . . . . . . . .
+         *              e           .     regUp
+         *                             .
+         *                         regLo  .
+         *                                   .
+        */
+
 		/* eLo->Dst is above eUp, so splice eLo->Dst into eUp */
 		RegionAbove(regUp)->dirty = regUp->dirty = TRUE;
 		e = tessMeshSplitEdge( tess->mesh, eUp );
@@ -541,6 +779,28 @@ static int CheckForLeftSplice( TESStesselator *tess, ActiveRegion *regUp )
 		e->Lface->inside = regUp->inside;
 	} else {
 		if( EdgeSign( eLo->Dst, eUp->Dst, eLo->Org ) > 0 ) return FALSE;
+
+        /* 
+         * before:
+         *                               .
+         *                             .
+         *                          .  regUp
+         * . . . . . . . . . . . . . . . . . . .
+         *          regLo      .        
+         *                  .             
+         *               .          
+         *                                  
+         *
+         * after: 
+         * 
+         *                               .
+         *                             .
+         *                          .  regUp
+         * . . . . . . . . . . . . . . . . . . .
+         *            e              regLo               
+         *                                
+         *
+         */
 
 		/* eUp->Dst is below eLo, so splice eUp->Dst into eLo */
 		regUp->dirty = regLo->dirty = TRUE;
@@ -843,6 +1103,43 @@ static void ConnectRightVertex( TESStesselator *tess, ActiveRegion *regUp,
 	* through vEvent, or may coincide with new intersection vertex
 	*/
 	if( VertEq( eUp->Org, tess->event )) {
+
+
+        /* before:                                      
+         *                                                .
+         *                                               .
+         *                                              .
+         * . . . . . . . . . . . . . . . . . . . . . . x. event 
+         *                     regUp                 . . 
+         *                                         .  .
+         *                                       .   .
+         *                           eTopLeft  .    .
+         *                                         .
+         *                                        .
+         *                                     eBottomLeft
+         *
+         * . . . . . . . . . . . . . . . . . . . . . . .
+         *                     regLo
+         *
+         *
+         * after:
+         *
+         * . . . . . . . . . . . . . . . . . . . . . . . . .
+         *                     regUp
+         *                                                 .
+         *                                                .
+         * . . . . . . . . . . . . . . . . . . . . . . .. event 
+         *                     eTopLeft              . . 
+         *                region(finished)         .  .
+         *                                       .   .
+         *                                     .    .
+         *                                         .
+         *                                        .
+         *                                     eBottomLeft
+         *
+         * . . . . . . . . . . . . . . . . . . . . . . .
+         *                     regLo
+         */
 		if ( !tessMeshSplice( tess->mesh, eTopLeft->Oprev, eUp ) ) longjmp(tess->env,1);
 		regUp = TopLeftRegion( tess, regUp );
 		if (regUp == NULL) longjmp(tess->env,1);
@@ -851,6 +1148,21 @@ static void ConnectRightVertex( TESStesselator *tess, ActiveRegion *regUp,
 		degenerate = TRUE;
 	}
 	if( VertEq( eLo->Org, tess->event )) {
+
+        /* before:                                      
+         * . . . . . . . . . . . . . . . . . . . . . . 
+         *                     regUp                 
+         *                                         
+         *
+         *
+         *                                 .       .
+         *                                    .     .
+         *                        eBottomLeft    .   .
+         *                                          . .
+         * . . . . . . . . . . . . . . . . . . . . . .xx event
+         *                     regLo
+         *
+         */
 		if ( !tessMeshSplice( tess->mesh, eBottomLeft, eLo->Oprev ) ) longjmp(tess->env,1);
 		eBottomLeft = FinishLeftRegions( tess, regLo, NULL );
 		degenerate = TRUE;
@@ -860,10 +1172,32 @@ static void ConnectRightVertex( TESStesselator *tess, ActiveRegion *regUp,
 		return;
 	}
 
+    /*                     eNew'
+     * . . . . . . . . . . . . . . . . . . . . . .. 
+     *                     regUp                 *  .
+     *                                          *     .
+     *                             .           *
+     *                               .        * fixEdge'
+     *                                 .     *
+     *                                   .  *
+     *                 .   .   .   .   .   . event
+     *                                    . .
+     *                                   .   .
+     *                                  .     .
+     *                                 .       .
+     *                                .         .fixEdge
+     *                          eBottomLeft      .
+     *                                            .     .
+     *                                             .  .
+     * . . . . . . . . . . . . . . . . . . . . . . ..  eNew
+     *                     regLo
+     */
+
 	/* Non-degenerate situation -- need to add a temporary, fixable edge.
 	* Connect to the closer of eLo->Org, eUp->Org.
 	*/
 	if( VertLeq( eLo->Org, eUp->Org )) {
+        // TODO why?
 		eNew = eLo->Oprev;
 	} else {
 		eNew = eUp;
@@ -899,6 +1233,21 @@ static void ConnectLeftDegenerate( TESStesselator *tess,
 	TESShalfEdge *e, *eTopLeft, *eTopRight, *eLast;
 	ActiveRegion *reg;
 
+    /*                                  event
+     *       ..............................
+     *               regUp                 .
+     *                                      .   .
+     *                                       .       .
+     *                                        .
+     *                                         .
+     *
+     *
+     *  
+     *   
+     *   .................................
+     *          regLo
+     */
+
 	e = regUp->eUp;
 	if( VertEq( e->Org, vEvent )) {
 		/* e->Org is an unprocessed vertex - just combine them, and wait
@@ -908,6 +1257,21 @@ static void ConnectLeftDegenerate( TESStesselator *tess,
 		SpliceMergeVertices( tess, e, vEvent->anEdge );
 		return;
 	}
+
+    /*                                  event
+     *       ...............................................
+     *               regUp                 .
+     *                                      .   .
+     *                                       .       .
+     *                                        .
+     *                                         .
+     *
+     *
+     *  
+     *   
+     *   .................................
+     *          regLo
+     */
 
 	if( ! VertEq( e->Dst, vEvent )) {
 		/* General case -- splice vEvent into edge e which passes through it */
@@ -921,6 +1285,51 @@ static void ConnectLeftDegenerate( TESStesselator *tess,
 		SweepEvent( tess, vEvent );	/* recurse */
 		return;
 	}
+
+    /* before
+     *                      .
+     *                    .
+     *                  .
+     *                .           .
+     *              .        .
+     *            .     .
+     *          .  .
+     * event x x.............................................
+     *        .                  regUp
+     *         .   .
+     *          .       .
+     *           .
+     *            .
+     *
+     *   
+     *   .................................
+     *          regLo
+     *
+     * after:
+     *
+     *          .......................................
+     *                           regUp
+     *
+     *                   eTopRight
+     *                      .
+     *                    .
+     *  (eLast)         .
+     * eTopLeft       . reg       .
+     * .            .        .
+     *    .       .     .
+     *       .  .  .
+     * event x x.............................................
+     *        .                   
+     *         .   .
+     *          .       .
+     *           .
+     *            .
+     *
+     *   
+     *   .................................
+     *          regLo
+
+     */
 
 	/* vEvent coincides with e->Dst, which has already been processed.
 	* Splice in the additional right-going edges.
@@ -995,9 +1404,40 @@ static void ConnectLeftVertex( TESStesselator *tess, TESSvertex *vEvent )
 	reg = VertLeq( eLo->Dst, eUp->Dst ) ? regUp : regLo;
 
 	if( regUp->inside || reg->fixUpperEdge) {
+
+        /*                   
+         *       ............................
+         *     . \.      regUp: reg
+         *   .      .
+         *       eNew .           .
+         *              .      . 
+         *            event . . . . .
+         *                    .                  inside? split it
+         *                      .
+         *       new region
+         * .
+         *  .
+         *   ..................
+         *          regLo
+         */
 		if( reg == regUp ) {
 			eNew = tessMeshConnect( tess->mesh, vEvent->anEdge->Sym, eUp->Lnext );
 			if (eNew == NULL) longjmp(tess->env,1);
+
+        /*                   
+         *   ............................
+         *  .          regUp
+         * .
+         *                        .
+         *                     . 
+         *            event . . . . .
+         *                .   .                  inside? split it
+         *              .       .
+         *    .       . eNew
+         *      . | .   new region
+         *        ..................
+         *            regLo: reg
+         */
 		} else {
 			TESShalfEdge *tempHalfEdge= tessMeshConnect( tess->mesh, eLo->Dnext, vEvent->anEdge);
 			if (tempHalfEdge == NULL) longjmp(tess->env,1);
@@ -1007,6 +1447,7 @@ static void ConnectLeftVertex( TESStesselator *tess, TESSvertex *vEvent )
 		if( reg->fixUpperEdge ) {
 			if ( !FixUpperEdge( tess, reg, eNew ) ) longjmp(tess->env,1);
 		} else {
+            // newRegion.edge.winding += regUp.edge.winding
 			ComputeWinding( tess, AddRegionBelow( tess, regUp, eNew ));
 		}
 		SweepEvent( tess, vEvent );
@@ -1035,6 +1476,13 @@ static void SweepEvent( TESStesselator *tess, TESSvertex *vEvent )
 	* already in the dictionary.  In this case we don't need to waste
 	* time searching for the location to insert new edges.
 	*/
+ 
+    /*            .
+     *         . 
+     * . . . > . . . . . .>
+     *        .  
+     *          .
+     */
 	e = vEvent->anEdge;
 	while( e->activeRegion == NULL ) {
 		e = e->Onext;
@@ -1044,6 +1492,22 @@ static void SweepEvent( TESStesselator *tess, TESSvertex *vEvent )
 			return;
 		}
 	}
+
+    /* <------------------------------------
+     *                 regUp
+     *
+     * .- 
+     * |   . eTopLeft
+     *         . 
+     *       reg   .
+     *   <. . . . . . . event
+     *    activeRegion
+     *             .
+     *           .
+     *         . 
+     *       .
+     *   ebottomLeft
+     */
 
 	/* Processing consists of two phases: first we "finish" all the
 	* active regions where both the upper and lower edges terminate
@@ -1076,6 +1540,13 @@ static void SweepEvent( TESStesselator *tess, TESSvertex *vEvent )
 * merged with real input features.
 */
 
+/*
+ * <----------------------
+ *
+ *    edges
+ *
+ * <----------------------
+ */
 static void AddSentinel( TESStesselator *tess, TESSreal smin, TESSreal smax, TESSreal t )
 /*
 * We add two sentinel edges above and below all other edges,
