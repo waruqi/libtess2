@@ -654,7 +654,9 @@ static int CheckForRightSplice( TESStesselator *tess, ActiveRegion *regUp )
 			regUp->dirty = regLo->dirty = TRUE;
 
 		}
-        /* before:
+        /* for CheckForIntersect
+         *
+         * before:
          *
          * . 
          *              .                                                
@@ -1010,6 +1012,49 @@ static void WalkDirtyRegions( TESStesselator *tess, ActiveRegion *regUp )
 		eUp = regUp->eUp;
 		eLo = regLo->eUp;
 
+        /* may violate ordering because of numerical errors
+         *
+         * before:
+         *
+         *            event                    
+         *               .                 
+         * . . . . . . . . . . . . . . . . . . . . .
+         *                 .   .       regUp
+         *                  .    .
+         *                   .      .
+         *                   e2        . e1
+         *
+         *            
+         *
+         *                        e1
+         *                       .
+         *                     .    . e2
+         *                   .  .
+         * . . . . . . . . . . . . . . . . . . . . .
+         *               .             regLo
+         *            event
+         *
+         *
+         * after:
+         *
+         *            event                 
+         * . . . . . . . x . . . . . . . . . . . . .
+         *      new       . .
+         *                 .   .       regUp
+         *                  .    .
+         *                   .      .
+         *                   e2        . e1
+         *
+         *            
+         *
+         *                        e1
+         *                       .
+         *                     .    . e2
+         *                   .  .
+         *      new        . .
+         * . . . . . . . x . . . . . . . . . . . . .
+         *            event            regLo
+         */
 		if( eUp->Dst != eLo->Dst ) {
 			/* Check that the edge ordering is obeyed at the Dst vertices. */
 			if( CheckForLeftSplice( tess, regUp )) {
@@ -1031,6 +1076,24 @@ static void WalkDirtyRegions( TESStesselator *tess, ActiveRegion *regUp )
 				}
 			}
 		}
+
+        /*                                .
+         *                               .
+         * . . . . . . . . . . . . . . .x. . . . . .
+         *                             .
+         *                            .
+         *                           .e1
+         *                          .
+         *                         .   
+         *                 event  . . . . . . . . e2
+         *                          .     
+         *                            .
+         *                              . e3
+         *                                .
+         * . . . . . . . . . . . . . . . . .x. . . .
+         *                                   .
+         *                                      .
+         */
 		if( eUp->Org != eLo->Org ) {
 			if(    eUp->Dst != eLo->Dst
 				&& ! regUp->fixUpperEdge && ! regLo->fixUpperEdge
@@ -1048,6 +1111,15 @@ static void WalkDirtyRegions( TESStesselator *tess, ActiveRegion *regUp )
 					/* WalkDirtyRegions() was called recursively; we're done */
 					return;
 				}
+
+            /* may violate ordering because of numerical errors for nearly identical slopes
+             *
+             *                                   regLo
+             *                 event  . . . . . . . . . . . . . . . 
+             *                                .                   
+             *                                          .           
+             *                                     regUp          .  
+             */
 			} else {
 				/* Even though we can't use CheckForIntersect(), the Org vertices
 				* may violate the dictionary edge ordering.  Check and correct this.
@@ -1055,6 +1127,7 @@ static void WalkDirtyRegions( TESStesselator *tess, ActiveRegion *regUp )
 				(void) CheckForRightSplice( tess, regUp );
 			}
 		}
+        // may be from CheckForRightSplice
 		if( eUp->Org == eLo->Org && eUp->Dst == eLo->Dst ) {
 			/* A degenerate loop consisting of only two edges -- delete it. */
 			AddWinding( eLo, eUp );
