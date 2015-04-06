@@ -845,15 +845,51 @@ static int CheckForIntersect( TESStesselator *tess, ActiveRegion *regUp )
 	assert( orgUp != tess->event && orgLo != tess->event );
 	assert( ! regUp->fixUpperEdge && ! regLo->fixUpperEdge );
 
+    /* .
+     *    .
+     *       .
+     *     .
+     *   .
+     */
 	if( orgUp == orgLo ) return FALSE;	/* right endpoints are the same */
 
+    /* no intersection?
+     *   .   
+     *            .
+     *                      . tMinUp
+     *
+     *                      . tMaxLo
+     *            .
+     *   .
+     */
 	tMinUp = MIN( orgUp->t, dstUp->t );
 	tMaxLo = MAX( orgLo->t, dstLo->t );
 	if( tMinUp > tMaxLo ) return FALSE;	/* t ranges do not overlap */
 
+    // no intersection?
 	if( VertLeq( orgUp, orgLo )) {
+        /* 
+         *                          .
+         *   . . . . orgUp      .
+         *                  .
+         *             .
+         *        .
+         *   .     eLo
+         *
+         */
 		if( EdgeSign( dstLo, orgUp, orgLo ) > 0 ) return FALSE;
 	} else {
+        /* 
+         *       
+         *    .
+         *       .
+         *          . eUp
+         *             .
+         *                .
+         * . . . . . orgLo   .
+         *                      .
+         */
+
 		if( EdgeSign( dstUp, orgLo, orgUp ) < 0 ) return FALSE;
 	}
 
@@ -867,6 +903,40 @@ static int CheckForIntersect( TESStesselator *tess, ActiveRegion *regUp )
 	assert( MIN( dstLo->s, dstUp->s ) <= isect.s );
 	assert( isect.s <= MAX( orgLo->s, orgUp->s ));
 
+    /* before:
+     *
+     *  intersection with numerical error
+     *       |
+     *       |
+     *       | .
+     *       * e . . . . . . . . . . . . . . . 
+     *         |.             eLo
+     *         | 
+     *         | .
+     *         |    eUp
+     *         |  .
+     *         |
+     *         |   .
+     *         |
+     *     sweep line
+     *
+     * after:
+     *
+     * intersection: e
+     *
+     *         .
+     *         e . . . . . . . . . . . . . . . 
+     *         |.             eLo
+     *         | 
+     *         | .
+     *         |   eUp
+     *         |  .
+     *         |
+     *         |   .
+     *         |
+     *     sweep line
+  
+     */
 	if( VertLeq( &isect, tess->event )) {
 		/* The intersection point lies slightly to the left of the sweep line,
 		* so move it until it''s slightly to the right of the sweep line.
@@ -883,6 +953,39 @@ static int CheckForIntersect( TESStesselator *tess, ActiveRegion *regUp )
 	* (If you have the test program, try running test54.d with the
 	* "X zoom" option turned on).
 	*/
+
+    /* before:                          
+     *                      intersection with numerical error
+     *                           |
+     *                           |
+     *                       orgMin
+     *                          .|
+     *  . . . . . . . . . . . . . .
+     *              eUp        .
+     *
+     *                        .
+     *
+     *                       . eLo
+     *
+     *                      .
+     *
+     * after: 
+     *                   real intersection 
+     *                          |
+     *                          |
+     *                       orgMin
+     *                          .
+     *  . . . . . . . . . . . . . .
+     *              eUp        .
+     *
+     *                        .
+     *
+     *                       . eLo
+     *
+     *                      .
+     *
+
+     */
 	orgMin = VertLeq( orgUp, orgLo ) ? orgUp : orgLo;
 	if( VertLeq( orgMin, &isect )) {
 		isect.s = orgMin->s;
@@ -914,10 +1017,69 @@ static int CheckForIntersect( TESStesselator *tess, ActiveRegion *regUp )
 		* wrong side of the sweep event, or through it.  This can happen
 		* due to very small numerical errors in the intersection calculation.
 		*/
+
+        /*
+         *      .          
+         *          .           
+         *  regUp/eUp   .       
+         *                  .                
+         *          event . . . x . . . . . . . . . . . .
+         *             . . .    |   .        regLo/eLo
+         *          .   .   .   |       .
+         *       .     .     .  |           .
+         *    numerical error - |               .
+         *                      |
+         *                      x
+         *                      |
+         *                intersection with numerical error
+         *
+         */
 		if( dstLo == tess->event ) {
 			/* Splice dstLo into eUp, and process the new region(s) */
+            /*
+             *       .
+             *           .                      
+             *    regUp/eUp  .               
+             *                   .       
+             *          event . . . x . . . . . . . . . . . .
+             *             . . .        .      regLo/eLo  
+             *          .   .   .           .   
+             *       .     .     .              . edge_new
+             *    .       .       .
+             */
 			if (tessMeshSplitEdge( tess->mesh, eUp->Sym ) == NULL) longjmp(tess->env,1);
+            /*
+             *       .
+             *         .                       . edge_new
+             *regUp/eUp  .               .     |
+             *             .       .           |
+             *          event . . . . . . . . . . . . . . . . eLo.sym
+             *             . .|.    regLo/eLo  |
+             *          .   . | .              |
+             *       .     .  |  .             . dst
+             *    .       .   |   .
+             *           intersection
+             */
+
 			if ( !tessMeshSplice( tess->mesh, eLo->Sym, eUp ) ) longjmp(tess->env,1);
+
+            /*
+             * . . . . . . . . . . . . . . . . . . . . . . 
+             *                     regUp'
+             *
+             *       .
+             *         .                       . edge_new (no region, so add it)
+             *      eUp  .               .     |
+             * (finished)  .       .           |
+             *          event . . . . . . . . . . . . . . . .
+             *             . .|.               |     regLo/eLo
+             *          .   . | .              |
+             *       .     .  |  .             . dst
+             *    .       .   |   .  
+             *                |
+             *                |
+             *          intersection 
+             */
 			regUp = TopLeftRegion( tess, regUp );
 			if (regUp == NULL) longjmp(tess->env,1);
 			eUp = RegionBelow(regUp)->eUp;
@@ -925,10 +1087,76 @@ static int CheckForIntersect( TESStesselator *tess, ActiveRegion *regUp )
 			AddRightEdges( tess, regUp, eUp->Oprev, eUp, eUp, TRUE );
 			return TRUE;
 		}
+
+        /*
+         *                intersection with numerical error
+         *                      |
+         *                      x
+         *                      |
+         *       .     .     .  |           .
+         *          .   .   .   |       .
+         *             . . .    |   .
+         *          event . . . x . . . . . . . . . . . .
+         *                  .               regUp/eUp
+         *              .               
+         *          .  regLo/eLo                   
+         *      .
+         *
+         */
 		if( dstUp == tess->event ) {
+
+            /*
+             *       .     .      .            . edge_new
+             *          .   .    .        .      
+             *             . .  .     .            
+             *          event . . x . . . . . . . . . . . . .
+             *                 .             regUp/eUp    
+             *              .                     
+             *           .  regLo/eLo                       
+             *        .
+             *
+             */
+           
 			/* Splice dstUp into eLo, and process the new region(s) */
 			if (tessMeshSplitEdge( tess->mesh, eLo->Sym ) == NULL) longjmp(tess->env,1);
+    
+            /*
+             *          intersection
+             *                |
+             *                |
+             *                |      
+             *       .     .  |   .             . dst
+             *eUp.lnext'.   . |  .              |
+             *             . .| .               |
+             *          event . . . . . . . . . . . . . . . .
+             *              .       . regUp/eUp |
+             *            .               .     |
+             *          .  regLo/eLo            . edge_new     
+             *        .                        eLo.oprev'
+             *
+             */
+		
 			if ( !tessMeshSplice( tess->mesh, eUp->Lnext, eLo->Oprev ) ) longjmp(tess->env,1); 
+
+            /*
+             * . . . . . . . . . . . . . . . . . . . . . . . . .
+             *                          regUp'
+             *
+             *          intersection
+             *                |
+             *                |
+             *            e   |      
+             *       .     .  |     . eUp.rprev . dst
+             *   regLo' .   . |   . (region)    |
+             *  (finished) . .| .               |
+             *          event . . . . . . . . . . . . . . . . (no region, so add it)
+             *              .       .     eUp   |
+             *            .               .     |
+             *          .  eLo                  . edge_new (no region, so add it) 
+             *        .  (regLo/finished)
+             *
+             */
+
 			regLo = regUp;
 			regUp = TopRightRegion( regUp );
 			e = RegionBelow(regUp)->eUp->Rprev;
