@@ -1165,10 +1165,81 @@ static int CheckForIntersect( TESStesselator *tess, ActiveRegion *regUp )
 			AddRightEdges( tess, regUp, eLo->Onext, eUp->Rprev, e, TRUE );
 			return TRUE;
 		}
-		/* Special case: called from ConnectRightVertex.  If either
-		* edge passes on the wrong side of tess->event, split it
-		* (and wait for ConnectRightVertex to splice it appropriately).
-		*/
+        /* Special case: called from ConnectRightVertex.  If either
+         * edge passes on the wrong side of tess->event, split it
+         * (and wait for ConnectRightVertex to splice it appropriately).
+         * 
+         *                                                    .
+         * . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
+         *                    regUp                         .
+         *                                      event      .
+         *                              . . . . . .       .
+         *                                     . .       .
+         *                                   .  .       .
+         *                   (finished)    .   .       .
+         *                                    .       .
+         *                                   .       .
+         *                                          . regLo
+         *                                         .
+         *                                        .
+         */
+
+        /* TODO: optimizate repeat EdgeSign
+         *
+         * before:
+         *
+         *      .          
+         *          .           
+         *  regUp/eUp   .       
+         *                  .                
+         *                 .    .
+         *         . . . . . . event.
+         *                              .
+         *                . . . . . . . . . x . . . . . . . . . . . .
+         *             . . .                |   .        regLo/eLo
+         *          .   .   .               |       .
+         *       .     .     .              |           .
+         *                numerical error - |               .
+         *                                  |
+         *                                  x
+         *                                  |
+         *                            intersection with numerical error
+         *
+         * 
+         * after:
+         *
+         *      .          
+         *          .           
+         *  regUp/eUp   .       
+         *                  .                
+         *                 .    .
+         *         . . . . . . event.     event
+         *                              .   |
+         *                . . . . . . . . . x . . . . . . . . . . . .
+         *             . . .                    .        regLo/eLo
+         *          .   .   .                       .
+         *       .     .     .                          .
+         *                                                  . edge_new
+         *
+         * after ConnectRightVertex: if( VertEq( eUp->Org, tess->event )) {
+         *
+         *  . . . . . . . . . . . . . .. . . . . . . . . . 
+         *                     regUp
+         *
+         *                     .          
+         *                       .           
+         *                         .       
+         *                         . .                
+         *                           . .
+         *                  (finished) . .event
+         *                       . . . . . .|
+         *                . . . . . . . . . . . . . . . . . . . . . .
+         *             . . .                   .        regLo/eLo
+         *          .   .   .                    .
+         *       .     .     .                     .
+         *                                           . edge_new
+         *
+         */
 		if( EdgeSign( dstUp, tess->event, &isect ) >= 0 ) {
 			RegionAbove(regUp)->dirty = regUp->dirty = TRUE;
 			if (tessMeshSplitEdge( tess->mesh, eUp->Sym ) == NULL) longjmp(tess->env,1);
@@ -1193,6 +1264,34 @@ static int CheckForIntersect( TESStesselator *tess, ActiveRegion *regUp )
 	* the mesh (ie. eUp->Lface) to be smaller than the faces in the
 	* unprocessed original contours (which will be eLo->Oprev->Lface).
 	*/
+
+    /*
+     * before:
+     *                          .
+     *                            .
+     *                              .          
+     *                                .  intersection         
+     *                        regUp/eUp .   |    
+     *                                    . |             
+     *          event . . . . . . . . . . . x . . . . . . . . . . . .
+     *                        regLo/eLo       .        
+     *                                          .
+     *                                            .
+     *                                              .
+     *
+     * after:
+     *                          .
+     *                            .
+     *                              .          
+     *                                .  intersection (add to event queue)   
+     *                        regUp/eUp .   |   
+     *                                    . |              
+     *          event . . . . . . . . . . . . . . . . . . . . . . . . edge_new
+     *                        regLo/eLo       .        
+     *                                          .
+     *                                            .
+     *                                              . edge_new
+     */
 	if (tessMeshSplitEdge( tess->mesh, eUp->Sym ) == NULL) longjmp(tess->env,1);
 	if (tessMeshSplitEdge( tess->mesh, eLo->Sym ) == NULL) longjmp(tess->env,1);
 	if ( !tessMeshSplice( tess->mesh, eLo->Oprev, eUp ) ) longjmp(tess->env,1);
@@ -1413,7 +1512,7 @@ static void ConnectRightVertex( TESStesselator *tess, ActiveRegion *regUp,
          *                                                    .
          * . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
          *                    regUp                         .
-         *                                                 .
+         *                                      event      .
          *                              . . . . . .       .
          *                                     . .       .
          *                                   .  .       .
