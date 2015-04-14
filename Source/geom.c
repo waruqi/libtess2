@@ -215,20 +215,94 @@ void tesedgeIntersect( TESSvertex *o1, TESSvertex *d1,
 	* using the TransLeq ordering to find the intersection t-value.
 	*/
 
+    /* 
+     *        o2
+     *         . 
+     *           .
+     *             .
+     * . . . . . . . . . . . . . . .
+     * o1              .           d1
+     *                   .
+     *                     .
+     *                     d2
+     */
 	if( ! VertLeq( o1, d1 )) { Swap( o1, d1 ); }
 	if( ! VertLeq( o2, d2 )) { Swap( o2, d2 ); }
 	if( ! VertLeq( o1, o2 )) { Swap( o1, o2 ); Swap( d1, d2 ); }
 
-	if( ! VertLeq( o2, d1 )) {
+    /* 
+     *                                o2
+     *                                . 
+     *                                  .
+     *                               *    .
+     * . . . . . . . . . . . . . . . |      .
+     * o1                         d1 |        . 
+     *                               |          .
+     *                               |            .
+     *                              v.s            d2
+     */
+	if( ! VertLeq( o2, d1 )) 
+    {
 		/* Technically, no intersection -- do our best */
 		v->s = (o2->s + d1->s) / 2;
-	} else if( VertLeq( d1, d2 )) {
+	} 
+    /* 
+     * 
+     *                          o2
+     *                           . 
+     *                        z1 |  .
+     *                           |*|z2 .
+     * . . . . . . . . . . . . . . .      .
+     * o1                         d1         . 
+     *                                          .
+     *                                             .
+     *                                              d2
+     *
+     * or
+     *
+     *        o2
+     *          . 
+     *          |   .
+     *       z1 |       .
+     * . . . . . . . . . . * . . . . d1
+     * o1            dt    |    .  | z2 
+     *                     |        .
+     *                     |            .
+     *                     |           d2
+     *                     |
+     *                    v.s = (z2 * o2.s + z1 * d1.s) / (z1 + z2)
+     *
+     * if z1 + z2 > 0
+     *    => dt / (d1.s - o2.s) = z1 / (z1 + z2)
+     *    => dt = z1 * (d1.s - o2.s) / (z1 + z2)
+     *    => v.s = o2.s + dt = o2.s + z1 * (d1.s - o2.s) / (z1 + z2) 
+     *    => v.s = (o2.s * (z1 + z2) + z1 * (d1.s - o2.s)) / (z1 + z2)
+     *    => v.s = (o2.s * z1 + o2.s * z2 + z1 * d1.s - z1 * o2.s) / (z1 + z2)
+     *    => v.s = (o2.s * z2 + z1 * d1.s) / (z1 + z2)
+     */
+    else if( VertLeq( d1, d2 )) 
+    {
 		/* Interpolate between o2 and d1 */
 		z1 = EdgeEval( o1, o2, d1 );
 		z2 = EdgeEval( o2, d1, d2 );
 		if( z1+z2 < 0 ) { z1 = -z1; z2 = -z2; }
 		v->s = Interpolate( z1, o2->s, z2, d1->s );
-	} else {
+	} 
+    /* 
+     *        o2
+     *          . 
+     *          |   .
+     *       z1 |       .
+     * . . . . . . . . . . * . . . . . . . . . d1
+     * o1                  |    .       | z2 
+     *                     |        .   |
+     *                     |            .
+     *                     |           d2
+     *                     |
+     *                    v.s = (z2 * o2.s + z1 * d2.s) / (z1 + z2)
+     */
+    else 
+    {
 		/* Interpolate between o2 and d2 */
 		z1 = EdgeSign( o1, o2, d1 );
 		z2 = -EdgeSign( o1, d2, d1 );

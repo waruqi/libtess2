@@ -504,18 +504,18 @@ static void AddRightEdges( TESStesselator *tess, ActiveRegion *regUp,
          *      .  .
          *         .  . 
          *            .  .
-         *                  .
-         *                     .
+         *             e    .
+         *                     . ePrev
          * or
          *
          *   .
          *   .  . 
          *      .  .
-         *         .  . 
+         *         .  .ePrev 
          *            .  
          *               .  
          *                  .  
-         *                     .
+         *                     . e
          *
          */
 		regPrev->dirty = TRUE;
