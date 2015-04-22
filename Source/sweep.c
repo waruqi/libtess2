@@ -651,6 +651,8 @@ static int CheckForRightSplice( TESStesselator *tess, ActiveRegion *regUp )
 			/* Splice eUp->Org into eLo */
 			if ( tessMeshSplitEdge( tess->mesh, eLo->Sym ) == NULL) longjmp(tess->env,1);
 			if ( !tessMeshSplice( tess->mesh, eUp, eLo->Oprev ) ) longjmp(tess->env,1);
+
+            // regLo.eUp have been changed, need recheck it 
 			regUp->dirty = regLo->dirty = TRUE;
 
 		}
@@ -713,6 +715,10 @@ static int CheckForRightSplice( TESStesselator *tess, ActiveRegion *regUp )
          *
          */
 		/* eLo->Org appears to be above eUp, so splice eLo->Org into eUp */
+
+        // regUp have been changed, need recheck it
+        // Although the order of regUp and regLo have been ok,
+        // but may new region will be inserted after CheckForIntersect()
 		RegionAbove(regUp)->dirty = regUp->dirty = TRUE;
 		if (tessMeshSplitEdge( tess->mesh, eUp->Sym ) == NULL) longjmp(tess->env,1);
 		if ( !tessMeshSplice( tess->mesh, eLo->Oprev, eUp ) ) longjmp(tess->env,1);
@@ -1308,6 +1314,23 @@ static int CheckForIntersect( TESStesselator *tess, ActiveRegion *regUp )
 	return FALSE;
 }
 
+/*                                                       end
+ *            . . . . . . . . . .                        /|\
+ *                                                        |
+ *               dirty                               --   |
+ *        . . . . . . . . . . .                     |  |  |
+ *  AddRightEdges                                   |   --
+ *                    .                        --   |
+ *                 . dirty                    |  |  |
+ *              .                             |   --
+ *           . . . . . . . dirty         --   |
+ *             .                        |  |  |
+ *               .                      |   --
+ *                 . regUp/dirty   ->   |
+ *                                   |  |
+ *     . . . . . . . . . . . . . .    --
+ *
+ */
 static void WalkDirtyRegions( TESStesselator *tess, ActiveRegion *regUp )
 /*
 * When the upper or lower edge of any region changes, the region is
